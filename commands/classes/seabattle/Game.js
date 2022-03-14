@@ -64,7 +64,7 @@ class Game {
             return false
         }
         const result = { 
-            x: letters.indexOf(msg[0]),
+            x: letters.indexOf(msg[0].toLowerCase()),
             y: msg.match(/\d/g).join('')-1, 
             dir: this.dirCalc(msg.match(/.$/)[0])
         }

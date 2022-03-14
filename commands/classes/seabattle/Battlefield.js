@@ -137,8 +137,6 @@ class Battlefield {
                 message = 'Мимо'
             }
             this.matrix[y][x].shot = true
-        } else {
-            message = 'Неправильные координаты'
         }
         return message
     }
