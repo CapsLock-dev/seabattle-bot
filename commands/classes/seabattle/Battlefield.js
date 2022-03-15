@@ -110,7 +110,7 @@ class Battlefield {
 
     addShot(x, y) {
         let message = false
-        if (this.inField(x, y)) {
+        if (this.inField(x, y) && !this.matrix[y][x].shot) {
             if (this.matrix[y][x].ship != null) {
                 this.matrix[y][x].ship.size -= 1;
                 message = 'Попал'

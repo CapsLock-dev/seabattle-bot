@@ -5,9 +5,9 @@ module.exports = {
     name: 'seabattle',
     description: 'Морской бой',
     usage: '',
-    dm: true,
+    dmOnly: true,
     ownerOnly: false,
-    guild: false,
+    guildOnly: false,
     async execute(client, message) {
         if (client.seabattleQueue.includes(message.author) && client.seabattleInGame.includes(message.author)) {
             message.channel.send('Вы уже ищете игру или находитесь в ней')
