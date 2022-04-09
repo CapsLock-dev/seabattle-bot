@@ -27,9 +27,7 @@ class Player {
         this.collector.on('collect', async msg => {
             if (!msg.author.bot) this.#messageHandler(msg)
         })
-        this.collector.on('end', (collected, reason) => {
-            this.game.end(reason)
-        })
+        this.collector.on('end', (collected) => {})
     }
 
     async #messageHandler(msg) {
