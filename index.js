@@ -1,13 +1,14 @@
 const { Client, Collection, Intents } = require('discord.js')
 const fs = require('fs');
+const UserList = require('./UserList');
 
 const client = new Client({ 
     partials: ["CHANNEL"],
     intents: [Intents.FLAGS.DIRECT_MESSAGES, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILDS] 
 })
 client.commands = new Collection()
-client.seabattleQueue = new Array()
-client.seabattleInGame = new Array()
+client.seabattleQueue = new UserList()
+client.seabattleInGame = new UserList()
 
 for (file of fs.readdirSync('./commands').filter(file => file.endsWith('.js'))) {
     const command = require(`./commands/${file}`)
@@ -21,5 +22,4 @@ for (file of fs.readdirSync('./events').filter(file => file.endsWith('.js'))) {
         client.on(event.name, (...args) => event.execute(client, ...args));
     }
 }
- 
 client.login(process.env.token)

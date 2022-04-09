@@ -2,150 +2,53 @@ const Battlefield = require('./Battlefield')
 const Player = require('./Player')
 const Ship = require('./Ship')
 const Screen = require('./Screen')
+const Bot = require('./Bot')
 
 class Game {
     gameState = null
     turn = null
-    noTurn = null
     state = {
         preparation: 'Подготовка',
-        battle: 'Битва'
+        battle: 'Битва',
+        end: 'Конец'
     }
-
-    constructor(player, opponent, playerChannel, opponentChannel, client) {
-        this.player = new Player(player, new Screen(playerChannel, client), new Battlefield())
-        this.opponent = new Player(opponent, new Screen(opponentChannel, client), new Battlefield())
+    helpMsg = 'Укажите координаты места куда хотите выстрелить\nПример: а1'
+    /** 
+     * @param {Player} user1 
+     * @param {Player} user2 
+     */
+    constructor(user1, user2, client) {
+        this.player = user1
+        this.opponent = user2
         this.client = client
         this.start()
     }
+
     start() {
-        const filter = m => m.author.bot == false
-        this.collectorPlayer = this.player.screen.channel.createMessageCollector({ filter, idle: 10 * 60 * 60 * 1000 });
-        this.collectorOpponent = this.opponent.screen.channel.createMessageCollector({ filter, idle: 10 * 60 * 60 * 1000 });
-        this.collectorPlayer.on('collect', m => {
-            this.msgHandler(this.player, m)
-        })
-        this.collectorOpponent.on('collect', m => {
-            this.msgHandler(this.opponent, m)
-        })
-        this.collectorPlayer.on('end', (collected, reason) => {
-            this.end(reason)
-        })
-        this.collectorOpponent.on('end', (collected, reason) => {
-            this.end(reason)
-        })
         this.gameState = this.state.preparation
+        this.player.init(this)
+        this.opponent.init(this)
     }
 
-    dirCalc(dir) {
-        let direction = false
-        if (dir === 'в') {
-            direction = 'col'
-        } else if (dir === 'г') {
-            direction = 'row'
-        }
-        return direction
-    }
-
-    whichShip(ship) {
-        let shipNames = {
-            4: 'четырехпалубн',
-            3: 'трехпалубн',
-            2: 'двухпалубн',
-            1: 'однопалубн'
-        }
-        return shipNames[ship]  
-    }
-
-    coordCalc(msg) {
-        const letters = 'абвгдежзик'.split('')
-        msg.replace(' ', '')
-        if (msg.match(/\d/g) == null || msg.match(/.$/ == null)) {
-            return false
-        }
-        const result = { 
-            x: letters.indexOf(msg[0].toLowerCase()),
-            y: msg.match(/\d/g).join('')-1, 
-            dir: this.dirCalc(msg.match(/.$/)[0])
-        }
-        return result
-    }
-
-    async startBattle() {
-        this.swapTurn() 
-        this.sendBoth(`Ход игрока ${this.turn.user.username}`)
-        await this.turn.screen.sendMatrix(this.noTurn.battlefield.matrix, this.gameState, `Поле игрока ${this.noTurn.user.username}`)
-        this.turn.screen.sendMsg('Укажите координаты места куда хотите выстрелить\n> Пример: а1')
-    }
-
-    async repeat() {
-        this.sendBoth(`Ход игрока ${this.turn.user.username}`)
-        await this.turn.screen.sendMatrix(this.noTurn.battlefield.matrix, this.gameState, `Поле игрока ${this.noTurn.user.username}`)
-        this.turn.screen.sendMsg('Укажите координаты места куда хотите выстрелить\n> Пример: а1')
-    }
-
-    async preparation(msg, player) {
-        const { battlefield, screen } = player
-        if (msg.content.replace(' ', '') == 'рандом') {
-            battlefield.init()
-            battlefield.randomShips()
-            await screen.sendMatrix(battlefield.matrix, this.gameState, 'Ваше поле')
-            player.ready = true
-        } else {
-            if (this.coordCalc(msg.content) == false) {
-                return screen.sendMsg('Неправильные координаты')
-            } 
-            const { x, y, dir } = this.coordCalc(msg.content)
-            const output = battlefield.addShip(new Ship(battlefield.ships[0], dir, x, y))
-            const shipName = this.whichShip(battlefield.ships[0])
-            if (output) {
-                screen.sendMsg(output)
-                screen.sendMsg(`Укажите координаты ${shipName}ого корабля`)
-            } else {
-                screen.sendMsg(`${shipName}ый корабль установлен`)
-                await screen.sendMatrix(battlefield.matrix, this.gameState, 'Ваше поле')
-                battlefield.ships.shift()
-                screen.sendMsg(`Укажите координаты ${this.whichShip(battlefield.ships[0])}ого корабля`)
-                if (battlefield.ships.length == 0) player.ready = true
-            }
-        }
-        if (this.player.ready && this.opponent.ready) {
-            this.gameState = this.state.battle
-            this.startBattle()
+    shot(x, y, player) {
+        if (this.turn === player) {
+            let repeat = this.anotherPlayer(this.turn).shot(x, y, player)
+            if (this.gameState === this.state.end) setTimeout(() => {this.swapTurn(repeat)}, 1000)
         }
     }
 
-    async battle(msg, player) {
-        const { screen } = player
-        if (this.turn == player) {
-            const {x, y} = this.coordCalc(msg.content)
-            const output = this.noTurn.battlefield.addShot(x, y)
-            if (this.noTurn.battlefield.defeat) {
-                this.end(`Победа игрока ${this.turn.user.username}`)
-                return
-            }
-            if (output) {
-                this.sendBoth(`${output}. Выстрел: ${'абвгдежзик'[x]}${y+1}`)
-                await this.noTurn.screen.sendMatrix(this.noTurn.battlefield.matrix, this.gameState, 'Ваше поле')
-                if (output === 'Попал' || output === 'Убил'){
-                    this.repeat()
-                } else {
-                    this.startBattle()
-                }
-            } else {
-                screen.sendMsg('Укажите координаты места куда хотите выстрелить\n> Пример: а1')
-            }
-        }
+    end(reason) {
+        this.gameState = this.state.end
+        this.sendBoth(reason)
+        this.player.stopCollector()
+        this.opponent.stopCollector()
+        this.client.seabattleInGame.removeById(this.player.id)
+        this.client.seabattleInGame.removeById(this.opponent.id)
     }
 
-    async msgHandler(player, msg) {
-        if (msg.content === 'leave') {
-            this.end(`${player.user.username} покинул игру. \nИгра закончена`)
-        } else if (this.gameState === this.state.preparation) {
-            this.preparation(msg, player)
-        } else if(this.gameState === this.state.battle) {
-            this.battle(msg, player)
-        } 
+    sendBoth(msg) {
+        this.player.sendMsg(msg)
+        this.opponent.sendMsg(msg)
     }
 
     anotherPlayer(player) {
@@ -153,34 +56,23 @@ class Game {
         array.splice(array.indexOf(player), 1)
         return array[0]
     }
-    
-    end(reason) {
-        if (reason === 'user') return
-        if (reason !== 'idle') {
-            this.collectorOpponent.stop()
-            this.collectorPlayer.stop()
-        }       
-        this.sendBoth(reason)
-        this.client.seabattleInGame.splice(this.client.seabattleQueue.indexOf(this.player.user), 1)
-        this.client.seabattleInGame.splice(this.client.seabattleQueue.indexOf(this.opponent.user), 1)
+
+    swapTurn(repeat=false) { 
+        if (!repeat) {
+            if (this.turn) {
+                this.turn = this.anotherPlayer(this.turn)
+            } else {
+                this.turn = [this.player, this.opponent][Math.round(Math.random())]
+            }
+        }
+        this.sendBoth('Ход игрока ' + this.turn.name)
+        this.turn.yourTurn(this.anotherPlayer(this.turn))
     }
 
-    sendBoth(msg) {
-        this.player.screen.sendMsg(msg)
-        this.opponent.screen.sendMsg(msg)
-    }
-
-    swapTurn() {
-        if (this.turn == this.player) {
-            this.turn = this.opponent
-            this.noTurn = this.player
-        } else if (this.turn == this.opponent) {
-            this.turn = this.player
-            this.noTurn = this.opponent
-        } else {
-            let array = [this.player, this.opponent]
-            this.turn = array[Math.round(Math.random())]
-            this.noTurn = this.anotherPlayer(this.turn)
+    readyCheck() {
+        if (this.player.ready && this.opponent.ready) {
+            this.gameState = this.state.battle
+            this.swapTurn()
         }
     }
 }
