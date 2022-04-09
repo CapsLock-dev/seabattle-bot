@@ -33,7 +33,7 @@ class Game {
     shot(x, y, player) {
         if (this.turn === player) {
             let repeat = this.anotherPlayer(this.turn).shot(x, y, player)
-            if (this.gameState === this.state.end) setTimeout(() => {this.swapTurn(repeat)}, 1000)
+            if (this.gameState !== this.state.end) setTimeout(() => {this.swapTurn(repeat)}, 1000)
         }
     }
 
